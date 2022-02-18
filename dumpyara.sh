@@ -108,13 +108,18 @@ for p in $PARTITIONS; do
         if [ $? -eq 0 ]; then
             rm "$p".img > /dev/null 2>&1
         else
-        #handling erofs images, which can't be handled by 7z
+        #handling e.g. erofs images, which can't be handled by 7z
             if [ -f $p.img ] && [ $p != "modem" ]; then
-                echo "Couldn't extract $p partition by 7z. Using fsck.erofs."
-                rm -rf "${p}"/*
-                "$PROJECT_DIR"/Firmware_extractor/tools/Linux/bin/fsck.erofs --extract="$p" "$p".img
+                echo "Couldn't extract $p partition by 7z binary. Script will try to mount it instead (sudo password might be needed once)"
+                rm -rf "${p}"/* # to avoid "cannot overwrite non-directory 'system/system' with directory 'system_/system'" error
+                mkdir "${p}_/" || rm -rf "${p:?}"/*
+                sudo mount -t auto -o loop "$p".img "${p}_/"
                 if [ $? -eq 0 ]; then
+                    sudo cp -rf "${p}_/"* "${p}"
+                    sudo umount "${p}_/"
+                    sudo rm -rf "${p}_/"
                     rm -fv "$p".img > /dev/null 2>&1
+                    sudo chown $(whoami) "${p}/" -R
                 else
                     echo "Couldn't extract $p partition. It might use an unsupported filesystem. For EROFS: make sure you're using Linux 5.4+ kernel"
                 fi
